@@ -1,0 +1,12 @@
+{
+    "symbol-whitelist": [
+        "Illuminate\\Contracts\\Cache\\Factory",
+        "Illuminate\\Contracts\\Cache\\LockProvider",
+        "Illuminate\\Contracts\\Cache\\Repository",
+        "Illuminate\\Contracts\\Config\\Repository",
+        "Illuminate\\Contracts\\Events\\Dispatcher",
+        "Illuminate\\Http\\Client\\Factory",
+        "Illuminate\\Support\\Facades\\Facade",
+        "Illuminate\\Support\\ServiceProvider"
+    ]
+}

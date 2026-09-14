@@ -1,0 +1,17 @@
+# Used only by the "Declared dependencies" job in tests.yml, which analyses src/ with the dev
+# dependencies uninstalled. Deliberately separate from phpstan.neon.dist: that one analyses
+# tests/ too, which cannot resolve PHPUnit once --no-dev has run, and includes larastan, which
+# is gone as well.
+#
+# Level 0 is enough. Not-found is a basic check, so a higher level buys nothing here and only
+# adds noise from types that legitimately live in dev.
+#
+# On a Laravel package this job is a supplement rather than the primary check: laravel/framework
+# replaces every illuminate/* component, so the framework supplies every Illuminate symbol
+# whether the package declared its component or not. composer-require-checker is what carries
+# the undeclared-dependency check here.
+parameters:
+    level: 0
+
+    paths:
+        - %currentWorkingDirectory%/src

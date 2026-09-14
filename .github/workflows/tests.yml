@@ -1,0 +1,148 @@
+name: Tests
+
+on:
+  push:
+  pull_request:
+  # A dormant package still needs to hear about a new PHP release. Note that
+  # GitHub disables scheduled workflows after 60 days without repository
+  # activity, and emails before it does.
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    name: PHP ${{ matrix.php }}, Laravel ${{ matrix.laravel }} ${{ matrix.deps }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      # The corners of the supported range, not the whole matrix. Everything between
+      # fails only when a corner does.
+      #
+      # One job per supported Laravel major, because a declared version that is never
+      # resolved is an unbacked promise. The floor takes --prefer-lowest, which is the
+      # only thing that ever resolves the dev toolchain low.
+      #
+      # The Laravel 12 job is the one that finds things here: PendingRequestClient sets
+      # four Guzzle options by hand, and Laravel 13 reads two of them defensively while
+      # 12 does not. A regression there passes every other job in this matrix.
+      #
+      # Laravel 13 gets both ends of the PHP range: it runs on 8.3 through 8.5, so it
+      # spans the range this package supports.
+      matrix:
+        include:
+          - { php: '8.3', laravel: '^12.0', testbench: '^10.0', deps: '--prefer-lowest' }
+          - { php: '8.3', laravel: '^13.0', testbench: '^11.0', deps: '' }
+          - { php: '8.5', laravel: '^13.0', testbench: '^11.0', deps: '' }
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: ${{ matrix.php }}
+          coverage: none
+
+      # --with, not `composer require`: it constrains within the declared range and
+      # refuses to go outside it, so the matrix cannot drift away from composer.json
+      # without the job failing. Every illuminate/* component is named, or Composer is
+      # free to satisfy the unnamed ones from a different major. Testbench is pinned
+      # alongside because its majors track Laravel's - Testbench 10 is Laravel 12,
+      # Testbench 11 is Laravel 13 - and letting Composer choose would quietly test a
+      # different Laravel than the job claims.
+      - run: >
+          composer update
+          --with="illuminate/contracts:${{ matrix.laravel }}"
+          --with="illuminate/http:${{ matrix.laravel }}"
+          --with="illuminate/support:${{ matrix.laravel }}"
+          --with="orchestra/testbench:${{ matrix.testbench }}"
+          --prefer-dist --no-progress ${{ matrix.deps }}
+
+      - run: vendor/bin/phpunit
+
+      # Also here, not only in a job of its own: phpstan.neon.dist covers the whole
+      # 8.3 - 8.5 PHP range in one pass wherever it runs, but its result still depends on
+      # the dependency tree it resolved against - including larastan's view of whichever
+      # Laravel was installed, which is the whole reason this job varies it.
+      - run: vendor/bin/phpstan analyse --no-progress
+
+  dependencies:
+    name: Declared dependencies
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          coverage: none
+          # Both tools are dev dependencies that the --no-dev install below deletes, so they
+          # have to come from outside the package. setup-php puts them outside every vendor
+          # tree, which for PHPStan is load-bearing rather than merely tidy: run from inside
+          # one, it picks up the autoloader sitting beside it and every package THAT tree
+          # happens to have installed resolves in the analysed code - so the check passes on
+          # exactly the undeclared class it exists to catch.
+          tools: phpstan, composer-require-checker
+
+      # One install serves both checks. The dev-free tree is what a consumer actually gets,
+      # which is the closure worth analysing; and the checker does not need the dev packages
+      # present, because its known-symbol set is built from what "require" NAMES rather than
+      # from what is in vendor/.
+      - run: composer install --no-dev --prefer-dist --no-progress
+
+      # The primary check on this package, and the only one that sees two of the three
+      # failure modes.
+      #
+      # A TRANSITIVE dependency - a class reached through something else we declared -
+      # survives --no-dev and so is invisible to the analysis below; it breaks for the
+      # consumer the day that intermediate package drops it. A missing ext-* is invisible to
+      # static analysis entirely, because a function from an absent extension looks exactly
+      # like one from core.
+      #
+      # The whitelist is not a way to silence findings. Every entry belongs to a component
+      # that IS in "require": laravel/framework "replace"s every illuminate/* component, so a
+      # lock that resolved the framework installs no vendor/illuminate/ and those symbols can
+      # never be attributed to what declares them. A NEW Illuminate symbol appearing here is a
+      # prompt to check "require", not to extend the list on sight.
+      - run: >
+          composer-require-checker check
+          --config-file=.github/composer-require-checker.json
+          composer.json
+
+      # The supplement: it reads the code rather than collecting symbol names, so it says
+      # WHERE in src/ an undeclared class is reached, and covers functions and constants
+      # alongside classes. On a Laravel package it is nearly vacuous - the framework supplies
+      # every Illuminate symbol whether its component was declared or not - so it never
+      # replaces the check above.
+      #
+      # -c is not optional. Without it PHPStan discovers the package's own
+      # phpstan.neon.dist, which points at tests/ and includes larastan - neither of which
+      # survives --no-dev - turning the run into a configuration error while you are trying
+      # to read it as a dependency result.
+      - run: >
+          phpstan analyse
+          -c .github/phpstan-nodev.neon
+          --autoload-file=vendor/autoload.php --no-progress
+
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: shivammathur/setup-php@f3e473d116dcccaddc5834248c87452386958240 # 2.37.2
+        with:
+          php-version: '8.3'
+          coverage: none
+
+      - run: composer validate --strict
+
+      - run: composer install --prefer-dist --no-progress
+
+      - run: vendor/bin/pint --test
