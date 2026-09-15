@@ -26,7 +26,7 @@
         "ext-ctype": "*",
         "guzzlehttp/guzzle": "^7.8|^8.0",
         "guzzlehttp/psr7": "^2.0|^3.0",
-        "hampel/saasu-api": "^0.1",
+        "hampel/saasu-api": "^0.2",
         "illuminate/contracts": "^12.0|^13.0",
         "illuminate/http": "^12.0|^13.0",
         "illuminate/support": "^12.0|^13.0",

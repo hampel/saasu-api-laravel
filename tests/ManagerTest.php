@@ -14,7 +14,7 @@ use Hampel\Saasu\Api\Laravel\Exception\UnknownConnection;
 use Hampel\Saasu\Api\Laravel\Facades\Saasu;
 use Hampel\Saasu\Api\Laravel\SaasuManager;
 use Hampel\Saasu\Api\Laravel\Tests\Fixture\LocklessStore;
-use Hampel\Saasu\Api\Throttle\IntervalThrottle;
+use Hampel\Saasu\Api\Laravel\Throttle\ProcessThrottle;
 use Hampel\Saasu\Api\Throttle\NoThrottle;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Support\Facades\Cache;
@@ -291,33 +291,18 @@ final class ManagerTest extends TestCase
     }
 
     #[Test]
-    public function the_process_throttle_is_one_per_file(): void
+    public function every_connection_shares_one_throttle(): void
     {
-        $this->container()->make(Config::class)->set('saasu.throttle', 'process');
-        $this->configure('same-file', ['file_id' => 12345, 'access_key' => 'k']);
+        // It keys on the file each request names, so sharing it is what makes two connections to
+        // one file wait for each other.
+        foreach (['process' => ProcessThrottle::class, 'cache' => CacheThrottle::class] as $mode => $class) {
+            $this->container()->make(Config::class)->set('saasu.throttle', $mode);
+            $this->container()->forgetInstance(SaasuManager::class);
+            $manager = $this->manager();
 
-        $manager = $this->manager();
-
-        $this->assertInstanceOf(IntervalThrottle::class, $manager->client('main')->connection()->throttle());
-        $this->assertSame($manager->client('main')->connection()->throttle(), $manager->client('same-file')->connection()->throttle());
-        $this->assertNotSame($manager->client('main')->connection()->throttle(), $manager->client('legacy')->connection()->throttle());
-    }
-
-    #[Test]
-    public function the_cache_throttle_is_keyed_by_file(): void
-    {
-        $this->container()->make(Config::class)->set('saasu.throttle', 'cache');
-        $this->configure('same-file', ['file_id' => 12345, 'access_key' => 'k']);
-
-        $manager = $this->manager();
-        $main = $manager->client('main')->connection()->throttle();
-        $legacy = $manager->client('legacy')->connection()->throttle();
-
-        $this->assertInstanceOf(CacheThrottle::class, $main);
-        $this->assertInstanceOf(CacheThrottle::class, $legacy);
-        $this->assertSame('saasu-throttle:12345', $main->key);
-        $this->assertSame('saasu-throttle:67890', $legacy->key);
-        $this->assertSame($main, $manager->client('same-file')->connection()->throttle());
+            $this->assertInstanceOf($class, $manager->client('main')->connection()->throttle());
+            $this->assertSame($manager->client('main')->connection()->throttle(), $manager->client('legacy')->connection()->throttle());
+        }
     }
 
     #[Test]
@@ -325,7 +310,7 @@ final class ManagerTest extends TestCase
     {
         $this->container()->make(Config::class)->set('saasu.throttle', ' Process ');
 
-        $this->assertInstanceOf(IntervalThrottle::class, $this->manager()->client()->connection()->throttle());
+        $this->assertInstanceOf(ProcessThrottle::class, $this->manager()->client()->connection()->throttle());
     }
 
     #[Test]

@@ -80,6 +80,23 @@ final class ReadmeExamplesTest extends TestCase
     }
 
     #[Test]
+    public function a_job_budget_counts_from_zero_on_a_client_that_has_already_sent_requests(): void
+    {
+        Http::fake(['api.saasu.com/*' => Http::response(self::contact())]);
+
+        $legacy = Saasu::client('legacy');
+        $legacy->contacts()->get(54353);
+
+        $saasu = $legacy->withRequestBudget(1);
+        $this->assertSame('Joe', $saasu->contacts()->get(54353)->givenName);
+        Http::assertSentCount(2);
+
+        $this->expectException(\Hampel\Saasu\Api\Exception\RequestBudgetExhaustedException::class);
+
+        $saasu->contacts()->get(54353);
+    }
+
+    #[Test]
     public function the_testing_example_runs_as_written(): void
     {
         // The throttle the README tells a consumer to turn off is already off in this suite.

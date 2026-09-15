@@ -56,8 +56,15 @@ retry, a warm-up. None exists, deliberately.
 
 ## The throttle: per file, slots reserved, the wait outside the lock
 
-- **Keyed by file id** (`CacheThrottle::keyFor()`). Saasu documents the limit without saying what it
-  counts; per file is the assumption the core package documents, and is unmeasured.
+- **Keyed on the file each request names**, which the core passes to `Throttle::wait(?int $fileId)`
+  from 0.2. So the manager builds one throttle per mode for every connection, and a client derived
+  with `withFileId()` waits on its new file. Requests naming no file — logins, the file list — share
+  `CacheThrottle::keyFor(null)`. Saasu documents the limit without saying what it counts; per file is
+  the assumption the core package documents, and is unmeasured.
+- **`process` mode is `ProcessThrottle`, one `IntervalThrottle` per file id**, because the core's
+  `IntervalThrottle` ignores the argument, and one shared instance would make different files wait
+  for each other. Probed: keying every file alike fails `ProcessThrottleTest`, and doing the same
+  in `CacheThrottle` fails eight tests, including the derived-client one.
 - **The lock is held for one read and one write.** The process then sleeps until its slot. A
   `LockTimeoutException` reaches the caller rather than sending anyway.
 - **The slot's cache lifetime is measured from the slot, not from now**, or a queue of waiting
@@ -66,12 +73,6 @@ retry, a warm-up. None exists, deliberately.
 - **A store without `LockProvider` is refused** for `throttle = cache`. Every store Laravel ships
   implements it, including `null`, whose locks always succeed and which remembers nothing — so the
   null store defeats the throttle silently. The README warns; there is no reliable check.
-- **Derived clients keep their parent's throttle.** The core's `withFileId()` shares the parent's
-  `Throttle` object, and `Throttle::wait()` is given no request, so a client moved to another file
-  still waits on the original file's key. The README tells a multi-worker application to configure a
-  connection per file instead.
-- **The manager memoises one throttle per file**, so two connections to one file in one process wait
-  for each other in `process` mode too.
 
 ## Credentials: OAuth wins, half a login is refused
 
@@ -85,9 +86,9 @@ four of them.
 ## No request budget in configuration
 
 The core `Config` takes a request budget, and it is deliberately not exposed. Clients are memoised
-for the life of the process, so in a queue worker a configured budget would be a lifetime cap. A
-client derived with `withConfig()` does not escape it either: derived clients share the parent's
-`RequestCounter`.
+for the life of the process, so in a queue worker a configured budget would be a lifetime cap. A job
+gets its own with `Client::withRequestBudget()`, from core 0.2, whose count starts at zero; the
+README shows it through the facade. `withConfig()` with a budget still shares the parent's count.
 
 ## The transport lives under `saasu.http_client`, never the shared PSR-18 key
 
@@ -110,6 +111,8 @@ passed on from an allowlist. `TransportTest` pins the options.
 
 ## Facts worth not rediscovering
 
+- **The core constraint is `^0.2`**, for `Throttle::wait(?int $fileId)` — a breaking change to the
+  interface both throttles implement — and `Client::withRequestBudget()`.
 - **The named-connection accessor is `client()` because `connection()` is taken** by `Client`.
   `FacadeConformanceTest::the_manager_does_not_shadow_a_client_method` keeps any name from being
   reintroduced. The config key is still `connections`.

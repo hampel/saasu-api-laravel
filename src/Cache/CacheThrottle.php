@@ -11,14 +11,19 @@ use Illuminate\Contracts\Cache\LockProvider;
 use Illuminate\Contracts\Cache\Repository;
 
 /**
- * One request per interval for a Saasu file, across every process sharing a cache store.
+ * One request per interval for each Saasu file, across every process sharing a cache store.
  *
  * The core package's IntervalThrottle sees one process. Saasu's limit of one request a second
  * belongs to the file, so three queue workers each keeping to it would send three a second
  * between them.
  *
+ * KEYED ON THE FILE EACH REQUEST NAMES, which the core package passes to wait(). So one instance
+ * serves every connection, and a client moved to another file with withFileId() waits on that
+ * file's turn rather than the one it was built for. A request naming no file - a login, or the
+ * list of files a login reaches - shares a key of its own.
+ *
  * SLOTS ARE RESERVED, AND THE WAIT HAPPENS OUTSIDE THE LOCK. Under a short lock, a process reads
- * the last slot handed out for this file, takes the later of now and that slot plus the interval,
+ * the last slot handed out for the file, takes the later of now and that slot plus the interval,
  * and writes it back. It then releases the lock and sleeps until its slot. Holding the lock while
  * sleeping would work too, but every waiting process would then be polling for the lock, and the
  * order they got it in would be arbitrary rather than first come, first served.
@@ -48,7 +53,6 @@ final class CacheThrottle implements Throttle
     private readonly Closure $clock;
 
     /**
-     * @param  string  $key  the cache key the last slot is kept under; one per Saasu file
      * @param  int  $lockTimeout  seconds to wait for the lock before raising LockTimeoutException
      * @param  (callable(float): void)|null  $sleep  receives seconds; defaults to usleep()
      * @param  (callable(): float)|null  $clock  answers seconds; defaults to microtime(true)
@@ -56,7 +60,6 @@ final class CacheThrottle implements Throttle
     public function __construct(
         private readonly Repository $cache,
         private readonly LockProvider $locks,
-        public readonly string $key,
         public readonly float $interval = IntervalThrottle::SAASU_INTERVAL,
         private readonly int $lockTimeout = self::LOCK_TIMEOUT,
         ?callable $sleep = null,
@@ -74,18 +77,19 @@ final class CacheThrottle implements Throttle
     }
 
     /**
-     * The cache key for a file's throttle. A client with no file id - one that only lists the
-     * files a login can reach - shares a key of its own.
+     * The cache key a file's last slot is kept under.
      */
     public static function keyFor(?int $fileId): string
     {
         return 'saasu-throttle:' . ($fileId ?? 'no-file');
     }
 
-    public function wait(): void
+    public function wait(?int $fileId): void
     {
-        $slot = $this->locks->lock($this->key . ':lock', self::LOCK_TIMEOUT)
-            ->block($this->lockTimeout, fn (): float => $this->reserve());
+        $key = self::keyFor($fileId);
+
+        $slot = $this->locks->lock($key . ':lock', self::LOCK_TIMEOUT)
+            ->block($this->lockTimeout, fn (): float => $this->reserve($key));
 
         $delay = (is_float($slot) ? $slot : 0.0) - ($this->clock)();
 
@@ -94,16 +98,16 @@ final class CacheThrottle implements Throttle
         }
     }
 
-    private function reserve(): float
+    private function reserve(string $key): float
     {
         $now = ($this->clock)();
-        $last = $this->cache->get($this->key);
+        $last = $this->cache->get($key);
 
         $slot = is_numeric($last) ? max($now, (float) $last + $this->interval) : $now;
 
         // Kept until the slot after this one has passed. A queue of waiting workers can put the
         // latest slot many seconds ahead, so the lifetime is measured from the slot, not from now.
-        $this->cache->put($this->key, $slot, (int) ceil($slot - $now + $this->interval) + 1);
+        $this->cache->put($key, $slot, (int) ceil($slot - $now + $this->interval) + 1);
 
         return $slot;
     }

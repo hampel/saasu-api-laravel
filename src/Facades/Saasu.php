@@ -66,6 +66,7 @@ use Illuminate\Support\Facades\Facade;
  * @method static Authentication authentication()
  * @method static FileIdentity verify()
  * @method static int requestsSent()
+ * @method static Client withRequestBudget(?int $budget)
  * @method static Client withFileId(int $fileId)
  * @method static Client withConfig(Config $config)
  * @method static Client withCredential(Authentication $authentication)

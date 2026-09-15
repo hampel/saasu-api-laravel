@@ -115,8 +115,11 @@ that is the only credential it has.**
 | none of them | nothing — refused |
 
 - **OAuth is Saasu's preferred scheme.** The login must not have two-factor authentication on,
-  because nothing unattended can answer the code Saasu texts. A login created for the integration
-  is better than a person's.
+  because nothing unattended can answer the code Saasu texts.
+- **Give the integration a login restricted to what it needs.** A Saasu user whose permissions in
+  the file are limited — to contacts, say — gets a token like any other, and Saasu holds that token
+  to those permissions: a request outside them raises `NotPermittedException`. A leaked password
+  that reaches only contacts cannot raise an invoice.
 - **The access key is Saasu's legacy scheme**, from Settings, Web Services. It travels in the URL
   of every request, where proxies and access logs can see it, and it belongs to one file, so a
   connection using it must have a `file_id`.
@@ -149,9 +152,9 @@ workers take turns in the order they arrived. It needs a store with atomic locks
 memcached, dynamodb, file or array — and is refused on one without. Workers on several hosts need
 clocks that agree. **The `null` store defeats it silently**: it remembers nothing, so nothing waits.
 
-**A client moved to another file keeps its throttle.** `Saasu::withFileId(67890)` shares the
-default connection's throttle, and so waits for the default connection's file, not file 67890. Where
-several workers use a second file, configure a connection for it.
+**The turn is the file's, whichever connection asks.** Two connections to one file wait for each
+other, and a client moved to another file with `Saasu::withFileId(67890)` waits on file 67890.
+Logins and the list of files a login reaches name no file, and share a turn of their own.
 
 ### Tokens
 
@@ -183,8 +186,15 @@ to Saasu's maximum** rather than its own default of 25, because every page is a 
 quota. `base_uri` exists for a recorded fixture served locally and for an outbound proxy that
 terminates the connection.
 
-There is no request budget setting. Clients are kept for the life of the process, so a budget
-configured here would count every request a queue worker had sent since it started.
+**There is no request budget setting**, because clients are kept for the life of the process, and a
+budget configured here would count every request a queue worker had sent since it started. Give a
+job its own instead:
+
+```php
+$saasu = Saasu::withRequestBudget(50);     // this job may send 50 requests, counted from zero
+```
+
+Past it, the next request raises `RequestBudgetExhaustedException` without being sent.
 
 ### Transport
 
@@ -253,6 +263,10 @@ try {
     // the login or key is no good. A configuration error, not an empty result.
 }
 ```
+
+**A restricted login is refused with `NotPermittedException`** — usually a 403, though tax codes
+answer a 400 saying so. One refusal does not say so: a restricted user's payment list answers a 400
+about a null collection, which arrives as `ValidationException`.
 
 `UnknownConnection` and `InvalidConfiguration` extend the core package's `SaasuException`, so an
 application already catching that catches these too.
@@ -331,7 +345,7 @@ at `error`, with any access key removed from the URI.
 ## Versioning
 
 `hampel/saasu-api` is 0.x, so its public API can change in a minor release; this package constrains
-it at `^0.1` and expects to bump.
+it at `^0.2` and expects to bump.
 
 ## License
 

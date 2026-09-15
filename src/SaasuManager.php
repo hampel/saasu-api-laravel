@@ -16,8 +16,8 @@ use Hampel\Saasu\Api\Exception\InvalidArgumentException;
 use Hampel\Saasu\Api\Laravel\Cache\CacheThrottle;
 use Hampel\Saasu\Api\Laravel\Exception\InvalidConfiguration;
 use Hampel\Saasu\Api\Laravel\Exception\UnknownConnection;
+use Hampel\Saasu\Api\Laravel\Throttle\ProcessThrottle;
 use Hampel\Saasu\Api\Result\Page;
-use Hampel\Saasu\Api\Throttle\IntervalThrottle;
 use Hampel\Saasu\Api\Throttle\NoThrottle;
 use Hampel\Saasu\Api\Throttle\Throttle;
 use Illuminate\Contracts\Cache\LockProvider;
@@ -38,13 +38,14 @@ use Psr\Log\LoggerInterface;
  * not available: `Client::connection()` is the core package's transport, and the manager forwards
  * unknown calls to the default client, so a connection() here would shadow it.
  *
- * Clients are memoised per name, and so is each file's throttle: two connections to the same file
- * in one process wait for each other, whichever throttle mode is configured.
+ * Clients are memoised per name. One throttle serves them all, and waits per file: the core package
+ * tells it which file each request names, so two connections to one file wait for each other, and
+ * a client moved to another file with withFileId() waits on that file.
  *
  * NO REQUEST BUDGET IS CONFIGURED HERE, although the core Config takes one. A memoised client in a
  * long-running queue worker would count every request since the worker started, so a budget set
- * as configuration would become a lifetime cap and eventually refuse everything. A client derived
- * with withConfig() does not escape that: it shares its parent's request count.
+ * as configuration would become a lifetime cap and eventually refuse everything. A budget belongs
+ * to a job: `Saasu::withRequestBudget(50)` derives a client whose count starts at zero.
  *
  * The @mixin is what makes $manager->contacts() analysable: __call() forwards anything the client
  * answers to, and one line that cannot drift says so. The facade repeats the list explicitly
@@ -134,7 +135,7 @@ final class SaasuManager
             $this->requestFactory,
             $this->streamFactory,
             $this->logger,
-            $this->throttle($fileId),
+            $this->throttle(),
         );
     }
 
@@ -202,23 +203,23 @@ final class SaasuManager
     }
 
     /**
-     * The throttle for a file, shared by every connection to it in this process.
+     * The throttle the configured mode describes, one per mode for every connection. Each keeps
+     * its own time per file.
      */
-    private function throttle(?int $fileId): Throttle
+    private function throttle(): Throttle
     {
         $mode = $this->config->get('saasu.throttle');
         $mode = is_string($mode) && trim($mode) !== '' ? strtolower(trim($mode)) : self::THROTTLE_CACHE;
-        $key = CacheThrottle::keyFor($fileId);
 
         return match ($mode) {
             self::THROTTLE_NONE => $this->throttles[$mode] ??= new NoThrottle(),
-            self::THROTTLE_PROCESS => $this->throttles[$mode . ':' . $key] ??= new IntervalThrottle(),
-            self::THROTTLE_CACHE => $this->throttles[$mode . ':' . $key] ??= $this->cacheThrottle($key),
+            self::THROTTLE_PROCESS => $this->throttles[$mode] ??= new ProcessThrottle(),
+            self::THROTTLE_CACHE => $this->throttles[$mode] ??= $this->cacheThrottle(),
             default => throw InvalidConfiguration::throttle($this->config->get('saasu.throttle')),
         };
     }
 
-    private function cacheThrottle(string $key): CacheThrottle
+    private function cacheThrottle(): CacheThrottle
     {
         $cache = ($this->cache)();
         $store = $cache->getStore();
@@ -229,7 +230,7 @@ final class SaasuManager
             throw InvalidConfiguration::storeWithoutLocks(is_string($name) && $name !== '' ? $name : 'default');
         }
 
-        return new CacheThrottle($cache, $store, $key);
+        return new CacheThrottle($cache, $store);
     }
 
     private function tokenStore(): TokenStore
