@@ -1,6 +1,6 @@
 # CHANGELOG
 
-## Unreleased
+## 0.1.1 (2026-11-18)
 
 - Accepts `hampel/saasu-api` `^0.3`, which adds `Contacts::firstWithReference()`
 
