@@ -236,6 +236,27 @@ different things depending on which class you thought you were calling.
 Everything past that point is the core package — see [its documentation][core] for the endpoints,
 entities, filters, pagination and updating a record.
 
+### Finding a contact by your own reference
+
+**Keep another system's id in the contact's reference — Saasu's `ContactId` field, which the core
+package calls `contactReference` — and look it up with `firstWithReference()`.** One request, matching
+the whole value and ignoring case:
+
+```php
+use Hampel\Saasu\Api\Filter\ContactFilter;
+use Hampel\Saasu\Api\Request\ContactRequest;
+
+Saasu::contacts()->create(ContactRequest::person('Jane', 'Citizen')->withContactReference('forum-1234'));
+
+$contact = Saasu::contacts()->firstWithReference('forum-1234');   // a Contact, or null
+```
+
+- **A custom field cannot be used for this.** Saasu ignores a filter on one, and its search does not
+  index them.
+- **A reference is not unique.** Saasu accepts a second contact with one already in use, and
+  `firstWithReference()` then answers whichever Saasu lists first. Where two would be a mistake worth
+  knowing about, `list(ContactFilter::all()->reference('forum-1234'))` shows every match.
+
 Inject the manager where a facade is not wanted:
 
 ```php
@@ -345,7 +366,7 @@ at `error`, with any access key removed from the URI.
 ## Versioning
 
 `hampel/saasu-api` is 0.x, so its public API can change in a minor release; this package constrains
-it at `^0.2` and expects to bump.
+it at `^0.2|^0.3` and expects to bump.
 
 ## License
 

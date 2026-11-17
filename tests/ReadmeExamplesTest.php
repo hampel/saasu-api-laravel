@@ -8,6 +8,7 @@ use Hampel\Saasu\Api\Entity\Contact;
 use Hampel\Saasu\Api\Entity\FileIdentity;
 use Hampel\Saasu\Api\Laravel\Facades\Saasu;
 use Hampel\Saasu\Api\Laravel\SaasuManager;
+use Hampel\Saasu\Api\Request\ContactRequest;
 use Hampel\Saasu\Api\Result\Page;
 use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Http\Client\Request;
@@ -94,6 +95,41 @@ final class ReadmeExamplesTest extends TestCase
         $this->expectException(\Hampel\Saasu\Api\Exception\RequestBudgetExhaustedException::class);
 
         $saasu->contacts()->get(54353);
+    }
+
+    #[Test]
+    public function a_contact_is_found_by_its_reference_the_way_the_readme_says(): void
+    {
+        // firstWithReference() arrived in core 0.3, and the constraint still accepts 0.2, which the
+        // --prefer-lowest CI job resolves. Skipped there rather than failed: the README describes the
+        // newest core it accepts.
+        //
+        // Reached through the manager's untyped __call() on purpose. Typed as Contacts, the guard
+        // below is always true to PHPStan against 0.3 and the call undefined against 0.2, and both
+        // corners run PHPStan over tests/.
+        $contacts = $this->container()->make(SaasuManager::class)->__call('contacts', []);
+        $this->assertIsObject($contacts);
+
+        if (! method_exists($contacts, 'firstWithReference')) {
+            $this->markTestSkipped('Contacts::firstWithReference() needs hampel/saasu-api 0.3.');
+        }
+
+        $this->fakeSaasu([
+            'api.saasu.com/Contacts*' => Http::response(['Contacts' => [self::contact(54353, ['ContactId' => 'forum-1234'])]]),
+            'api.saasu.com/Contact*' => Http::response(['InsertedContactId' => 54353, 'LastUpdatedId' => 'AAAAAFwWAN8=']),
+        ]);
+
+        Saasu::contacts()->create(ContactRequest::person('Jane', 'Citizen')->withContactReference('forum-1234'));
+
+        $contact = $contacts->firstWithReference('forum-1234');
+
+        $this->assertInstanceOf(Contact::class, $contact);
+        $this->assertSame('forum-1234', $contact->contactReference);
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), '/Contact?')
+            && $request['ContactId'] === 'forum-1234');
+        Http::assertSent(fn (Request $request): bool => str_contains($request->url(), 'Contacts?')
+            && str_contains($request->url(), 'ContactId=forum-1234')
+            && str_contains($request->url(), 'PageSize=1'));
     }
 
     #[Test]

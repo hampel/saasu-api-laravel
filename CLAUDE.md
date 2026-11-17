@@ -111,8 +111,11 @@ passed on from an allowlist. `TransportTest` pins the options.
 
 ## Facts worth not rediscovering
 
-- **The core constraint is `^0.2`**, for `Throttle::wait(?int $fileId)` — a breaking change to the
-  interface both throttles implement — and `Client::withRequestBudget()`.
+- **The core constraint is `^0.2|^0.3`.** The floor is 0.2 for `Throttle::wait(?int $fileId)` — a
+  breaking change to the interface both throttles implement — and `Client::withRequestBudget()`.
+  0.3 adds only `Contacts::firstWithReference()`, an endpoint method the facade needs no line for.
+  The README's contact-lookup section uses it, so its test in `ReadmeExamplesTest` skips itself
+  where `method_exists()` says the resolved core is 0.2 — which the `--prefer-lowest` CI job is.
 - **The named-connection accessor is `client()` because `connection()` is taken** by `Client`.
   `FacadeConformanceTest::the_manager_does_not_shadow_a_client_method` keeps any name from being
   reintroduced. The config key is still `connections`.
