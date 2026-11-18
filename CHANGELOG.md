@@ -1,5 +1,10 @@
 # CHANGELOG
 
+## 0.1.2 (2026-11-18)
+
+- README documents defining a persistent cache store under Laravel Zero
+- Tested with PHPUnit 13
+
 ## 0.1.1 (2026-11-18)
 
 - Accepts `hampel/saasu-api` `^0.3`, which adds `Contacts::firstWithReference()`
