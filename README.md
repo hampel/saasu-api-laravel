@@ -64,6 +64,33 @@ The global `Saasu` alias is not registered either. Import the facade class —
 `vendor:publish --tag=saasu-config` works in Laravel Zero once the provider is listed, though `list`
 does not show it: Laravel Zero hides the command rather than removing it.
 
+**Laravel Zero has no persistent cache store until you define one.** Without a `config/cache.php`
+its only store is `array`, which forgets everything when the process ends. Left on that, every run
+logs in again and spends quota, and the `cache` throttle spaces requests within one process only.
+Define a file store at an absolute path and name it in `cache_store`:
+
+```php
+// config/cache.php
+return [
+    'default' => 'array',
+    'stores' => [
+        'array' => ['driver' => 'array'],
+        'saasu' => ['driver' => 'file', 'path' => '/var/lib/your-tool/cache'],
+    ],
+];
+```
+
+```dotenv
+SAASU_CACHE_STORE=saasu
+```
+
+- **Not `storage_path()` in a compiled phar.** It resolves inside the archive, which is read-only.
+- **Protect it with the directory above it, created `0700`, not with the store's `permission`
+  option.** Laravel applies that mode to the cache's subdirectories as well as its files, and a
+  directory at `0600` cannot be entered.
+- **Run every invocation as the same user**, or one run leaves token and lock files the next cannot
+  rewrite.
+
 ## Configuration
 
 ```dotenv
