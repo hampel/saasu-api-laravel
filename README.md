@@ -144,9 +144,11 @@ that is the only credential it has.**
 - **OAuth is Saasu's preferred scheme.** The login must not have two-factor authentication on,
   because nothing unattended can answer the code Saasu texts.
 - **Give the integration a login restricted to what it needs.** A Saasu user whose permissions in
-  the file are limited — to contacts, say — gets a token like any other, and Saasu holds that token
-  to those permissions: a request outside them raises `NotPermittedException`. A leaked password
-  that reaches only contacts cannot raise an invoice.
+  the file are limited — to contacts, say — gets a token like any other, and Saasu refuses most
+  requests outside those permissions with `NotPermittedException`. A leaked password that reaches
+  only contacts cannot raise an invoice. It can still read the file's sales totals from
+  `Invoices/SalesStatsSummary`. Listing invoices needs both the Sale and Purchase permissions; Sale
+  alone is refused.
 - **The access key is Saasu's legacy scheme**, from Settings, Web Services. It travels in the URL
   of every request, where proxies and access logs can see it, and it belongs to one file, so a
   connection using it must have a `file_id`.
