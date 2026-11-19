@@ -105,7 +105,7 @@ final class ReadmeExamplesTest extends TestCase
         // newest core it accepts.
         //
         // Reached through the manager's untyped __call() on purpose. Typed as Contacts, the guard
-        // below is always true to PHPStan against 0.3 and the call undefined against 0.2, and both
+        // below is always true to PHPStan from 0.3 on and the call undefined against 0.2, and both
         // corners run PHPStan over tests/.
         $contacts = $this->container()->make(SaasuManager::class)->__call('contacts', []);
         $this->assertIsObject($contacts);

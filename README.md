@@ -393,7 +393,7 @@ at `error`, with any access key removed from the URI.
 ## Versioning
 
 `hampel/saasu-api` is 0.x, so its public API can change in a minor release; this package constrains
-it at `^0.2|^0.3` and expects to bump.
+it at `^0.2|^0.3|^0.4` and expects to bump.
 
 ## License
 
