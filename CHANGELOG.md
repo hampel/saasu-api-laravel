@@ -1,5 +1,11 @@
 # CHANGELOG
 
+## 0.1.3 (2026-11-20)
+
+- Accepts `hampel/saasu-api` `^0.4`, which adds `InvoiceType::SaleInvoice`
+- README describes what a restricted login can still read, and the permissions listing invoices
+  needs
+
 ## 0.1.2 (2026-11-18)
 
 - README documents defining a persistent cache store under Laravel Zero
