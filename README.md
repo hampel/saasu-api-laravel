@@ -310,7 +310,8 @@ try {
 } catch (NotFoundException $e) {
     // no such contact in this file
 } catch (NotAuthenticatedException $e) {
-    // the login or key is no good. A configuration error, not an empty result.
+    // the login or key is no good, or cannot reach this file. A configuration error, not an
+    // empty result. $e->oauthError() is set only when the login itself was refused.
 }
 ```
 
