@@ -148,7 +148,11 @@ that is the only credential it has.**
   requests outside those permissions with `NotPermittedException`. A leaked password that reaches
   only contacts cannot raise an invoice. It can still read the file's sales totals from
   `Invoices/SalesStatsSummary`. Listing invoices needs both the Sale and Purchase permissions; Sale
-  alone is refused.
+  alone is refused. Journals need the General Journal permission, which Sale and Purchase do not
+  include.
+- **A bank transfer made in Saasu's own screens cannot be read with any permission.** The API has
+  no endpoint for one, and it shows only in the two accounts' balances. Book it as a journal between
+  the bank accounts to make it readable.
 - **The access key is Saasu's legacy scheme**, from Settings, Web Services. It travels in the URL
   of every request, where proxies and access logs can see it, and it belongs to one file, so a
   connection using it must have a `file_id`.
