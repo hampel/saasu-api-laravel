@@ -103,7 +103,8 @@ transport. **Do not add a fallback to `ClientInterface` when it is bound.** Prob
 reading the shared key: nine tests fail, including `SharedPsr18BindingTest`'s before-order binding
 case and its faked-sibling case.
 
-The adapter is shared with the sibling Laravel API wrappers, and its docblock carries the reasoning
+The adapter is shared with the other `hampel/*-api-laravel` packages, such as
+`hampel/binarylane-api-laravel` and `hampel/cloudflare-api-laravel`, and its docblock carries the reasoning
 for each load-bearing decision: rebuilt per send, factory resolved per send, one Guzzle handler
 reused, `send()` with four options set by hand (Laravel 12 reads `laravel_data` and `on_stats`
 without a default, so only the Laravel 12 CI job catches their removal), and transport options
