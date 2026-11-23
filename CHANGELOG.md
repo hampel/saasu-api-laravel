@@ -1,5 +1,12 @@
 # CHANGELOG
 
+## Unreleased
+
+- Minimum Laravel versions are now 12.71 and 13.40, the lowest that Composer installs without a
+  security advisory block; `illuminate/*` requires `^12.71|^13.40`
+- README notes that a 401 can mean the login cannot reach the file, that journals need the General
+  Journal permission, and that a bank transfer made in Saasu's own screens cannot be read
+
 ## 0.1.3 (2026-11-20)
 
 - Accepts `hampel/saasu-api` `^0.4`, which adds `InvoiceType::SaleInvoice`

@@ -109,6 +109,28 @@ reused, `send()` with four options set by hand (Laravel 12 reads `laravel_data` 
 without a default, so only the Laravel 12 CI job catches their removal), and transport options
 passed on from an allowlist. `TransportTest` pins the options.
 
+## The Laravel floors are the lowest releases Composer will install
+
+`illuminate/*` is `^12.71|^13.40`. **Composer 2.9 and later refuse a release affected by a
+published security advisory**, by default, so on 2026-11-24 — measured on PHP 8.3 with Composer
+2.11.1 — `laravel/framework` 12.70.0 and 13.39.0 were refused and 12.71.0 and 13.40.0 installed.
+A floor below that declared versions nobody could install or test, and the `--prefer-lowest` job
+silently resolved 12.71 while its label said 12.0. The suite and PHPStan level 10 were run at both
+floors on PHP 8.3 before the constraint moved.
+
+**When a new advisory covers the floor, the `--prefer-lowest` job fails to resolve.** Raise the
+floor to what resolves, raise the `laravel:` values in the CI matrix to match, and re-run the suite
+and PHPStan there on PHP 8.3. To measure, from a copy with a lock file present (Composer refuses a
+partial update without one, and the error is easy to misread as success):
+
+```bash
+composer update "laravel/framework:12.70.0" "orchestra/testbench:^10.0" -W --dry-run
+composer update "laravel/framework:13.39.0" "orchestra/testbench:^11.0" -W --dry-run
+```
+
+`orchestra/testbench` is named because a lock holding the other major's Testbench requires the
+other Laravel, and the update is refused for that reason before any advisory is consulted.
+
 ## Facts worth not rediscovering
 
 - **The core constraint is `^0.2|^0.3|^0.4`.** The floor is 0.2 for
