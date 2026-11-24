@@ -132,6 +132,16 @@ composer update "laravel/framework:13.39.0" "orchestra/testbench:^11.0" -W --dry
 `orchestra/testbench` is named because a lock holding the other major's Testbench requires the
 other Laravel, and the update is refused for that reason before any advisory is consulted.
 
+**Guzzle and PSR-7 are floored the same way**: `^7.15.2|^8.1` and `^2.13|^3.1`, the lowest that
+resolved on the same date. The `--prefer-lowest` job picks Guzzle 7 and PSR-7 2, so the Guzzle 8
+and PSR-7 3 floors are checked by hand, naming both together, because PSR-7 3 resolves only beside
+Guzzle 8 and a lock holding Guzzle 8 refuses PSR-7 2:
+
+```bash
+composer update "guzzlehttp/guzzle:8.1.0" "guzzlehttp/psr7:3.1.0" -W --dry-run
+composer update "guzzlehttp/guzzle:^7.15.2" "guzzlehttp/psr7:2.13.0" -W --dry-run
+```
+
 ## Facts worth not rediscovering
 
 - **The core constraint is `^0.2|^0.3|^0.4`.** The floor is 0.2 for

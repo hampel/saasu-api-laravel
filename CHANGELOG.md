@@ -4,6 +4,8 @@
 
 - Minimum Laravel versions are now 12.71 and 13.40, the lowest that Composer installs without a
   security advisory block; `illuminate/*` requires `^12.71|^13.40`
+- Minimum Guzzle and PSR-7 versions raised for the same reason: `guzzlehttp/guzzle` requires
+  `^7.15.2|^8.1` and `guzzlehttp/psr7` `^2.13|^3.1`
 - README notes that a 401 can mean the login cannot reach the file, that journals need the General
   Journal permission, and that a bank transfer made in Saasu's own screens cannot be read
 

@@ -24,8 +24,8 @@
     "require": {
         "php": ">=8.3",
         "ext-ctype": "*",
-        "guzzlehttp/guzzle": "^7.8|^8.0",
-        "guzzlehttp/psr7": "^2.0|^3.0",
+        "guzzlehttp/guzzle": "^7.15.2|^8.1",
+        "guzzlehttp/psr7": "^2.13|^3.1",
         "hampel/saasu-api": "^0.2|^0.3|^0.4",
         "illuminate/contracts": "^12.71|^13.40",
         "illuminate/http": "^12.71|^13.40",
